@@ -1,0 +1,178 @@
+---
+title: "Capstone Project"
+output:
+  html_document: default
+  html_notebook: default
+---
+
+This is a data visualization and manipulation part of our capstone project. The data is from AMC company. 
+
+#### Background of this project
+
+*	AMC Theaters Data Set of Loyalty Members
+*	Insider members (free program) who have not upgraded
+*	Premier members (paid program) who were once Insider members and upgraded to the paid program
+*	Program information:  https://www.amctheatres.com/amcstubs 
+*	Does not include customers who paid to be Premier without first having an Insider membership
+*	Analysis focused on identifying people who have, or would, upgrade to the paid program
+*	Each paid membership is $15/year
+*	A 1% increase in paid program membership would yield approximately $xxx,xxx in membership revenue, in addition to lift from more engaged members
+
+### Loading the data into R notebook
+
+```{r}
+amcdata<-read.csv("C:/Users/jiena_000/Desktop/Capstone Project/AMCSampleData_InsiderPremier.csv", stringsAsFactors = F )
+head(amcdata)
+
+```
+
+### Summary table of data
+
+```{r}
+summary(amcdata)
+
+```
+
+### Check the frequency table of "IsPremier"
+
+```{r}
+table(amcdata$ISPREMIER)
+```
+
+Apparently, the data is imbalanced. Therefore, when we build a machine learning model, we have to check the AUC and ROC curve to have a better evaluation of models. 
+
+
+### Check the Gender code
+```{r}
+table(amcdata$GENDERCODE)
+```
+*	0 is female
+*	1 is male
+*	3 is Unknown
+
+### Correlation map
+* Since the whole dataset has 24 variables, it might be too big to plot into one map. I classify them into four categories: biograph, notification, AMC stubs financial activities, Financial status and other AMC activities.
+
+#### Correlation map of biograpic variables
+Please note that I remove the gender is unknown data points. 
+```{r}
+library(corrplot)
+ corrplot(cor(amcdata[,c(1:5)][which(amcdata$GENDERCODE!=3),]), method="number")
+
+```
+
+Obviously, "IsPremier" is not strongly related to any of biographic variables in this study. 
+
+### Notification variables
+The notification variables include:
+* AMCSTUBSLOYALTYEMAILOFFEROPTININDICATOR - 0 is false; 1 is true
+ *	Opted in to receive AMC Loyalty program email offers.
+*	AMCSTUBSREWARDSEMAILOPTININDICATOR - 0 is false; 1 is true 
+ *	Opted in to receive AMC Stubs emails.
+*	AMCSTUBSREWARDSMOBILEOPTININDICATOR - 0 is false; 1 is true
+ *  Opted in to receive AMC Stubs mobile notifications.
+*	AMCSTUBSREWARDSSMSOPTININDICATOR - 0 is false; 1 is true
+ *	Opted in to receive AM Stubs SMS messages.
+*	AMCSTUBSTHEATREMOBILEOFFEROPTININDICATOR - 0 is false; 1 is true
+ *	Opted in to receive AMC Stubs mobile theatre-level mobile offers.
+*	AMCSTUBSTHEATRESMSOFFEROPTININDICATOR - 0 is false; 1 is true 
+ *	Opted in to receive AMC Stubs theatre-level SMS offers.
+
+```{r}
+library(corrplot)
+ corrplot(cor(amcdata[,c(1,7,8,9,10,11,12)]), method="number",tl.cex = 0.4 )
+
+```
+Apparently, "IsPremier" is not strongly related to any notification variables. 
+
+### AMC stubs Member Financial Activities:
+*	LIFETIMEAMCSTUBSAWARDSEARNEDAMOUNT
+ *	Amount of rewards in dollars that an AMC Stubs member has earned.
+*	LIFETIMEAMCSTUBSSPENDAMOUNT
+ *	Amount of total spend by an AMC Stubs member.
+*	ONLINEFEESWAIVEDAMOUNT
+ *	Amount of dollars in online ticketing fees waived as an AMC Stubs member.
+ 
+ 
+```{r}
+library(corrplot)
+ corrplot(cor(amcdata[,c(1,13,14,15)]), method="number",tl.cex = 0.4 )
+
+```
+
+If we consider the variables with correlation value about .2, then the "LIFETIMEAMCSTUBSAWARDSEARNEDAMOUNT" and "LIFETIMEAMCSTUBSSPENDAMOUNT" might be considered into modeling process. 
+
+### Financial Status and other AMC activities
+
+*	ESTIMATEDINCOMERANGE
+ *	Axciom estimate of estimated income range for AMC Stubs member.
+*	ESTIMATEDHOMEMARKETVALUERANGE
+ *	Axcion estimated home market value range for AMC Stubs member.
+*	CHILDRENPRESENCE - 0 is false; 1 is true
+ *	Has children present in household.
+*	HASFREQUENTVISITTHEATRENUMBER - 0 is false; 1 is true
+ *	Has a most frequently visited theatre selected through the site or by another means.
+*	TICKETQTYSUM	
+ *	Number of tickets sold to this AMC Stubs member.
+*	TICKETBALANCEDUESUM
+ *	Total US dollar value of tickets sold to this AMC Stubs member.
+*	CONCQTYSUM
+ *	Total number of concession items purchased by this AMC Stubs member.
+*	CONCLOYDISCOUNTAMTSUM
+ *	Total amount of loyalty discount received by this AMC Stubs member (value in USD).
+*	CONCBALANCEDUESUM
+ *	Total US dollar value of concessions sold to this AMC Stubs member.
+
+```{r}
+library(corrplot)
+ corrplot(cor(amcdata[,c(1,16,17,18,19,20,21,22,23,24)]), method="number",tl.cex = 0.4 )
+
+```
+
+From this result, we can see that "Is Premier" is strongly related (0.2 above) to "TICKETQTYSUM", "TICKETBALANCEDUESUM", "CONCQTYSUM", "CONCLOYDISCOUNTAMTSUM" and "CONCBALANCEDUESUM". 
+
+### Correlation test for "Is Premier" with strong variables
+
+```{r}
+panel.cor <- function(x, y, digits=2, cex.cor)
+{
+  usr <- par("usr"); on.exit(par(usr))
+  par(usr = c(0, 1, 0, 1))
+  r <- abs(cor(x, y))
+  txt <- format(c(r, 0.123456789), digits=digits)[1]
+  test <- cor.test(x,y)
+  Signif <- ifelse(round(test$p.value,3)<0.001,"p<0.001",paste("p=",round(test$p.value,3)))  
+  text(0.5, 0.25, paste("r=",txt))
+  text(.5, .75, Signif)
+}
+
+panel.smooth<-function (x, y, col = "blue", bg = NA, pch = 18, 
+                        cex = 0.8, col.smooth = "red", span = 2/3, iter = 3, ...) 
+{
+  points(x, y, pch = pch, col = col, bg = bg, cex = cex)
+  ok <- is.finite(x) & is.finite(y)
+  if (any(ok)) 
+    lines(stats::lowess(x[ok], y[ok], f = span, iter = iter), 
+          col = col.smooth, ...)
+}
+
+panel.hist <- function(x, ...)
+{
+  usr <- par("usr"); on.exit(par(usr))
+  par(usr = c(usr[1:2], 0, 1.5) )
+  h <- hist(x, plot = FALSE)
+  breaks <- h$breaks; nB <- length(breaks)
+  y <- h$counts; y <- y/max(y)
+  rect(breaks[-nB], 0, breaks[-1], y, col="cyan", ...)
+}
+
+pairs(amcdata[,c(1,13,14,20,21,22,23,24)],
+      lower.panel=panel.smooth, upper.panel=panel.cor,diag.panel=panel.hist)
+
+
+```
+
+From the p-value of this graph, we can see that "Is Premier" is significantly correlated with "LIFETIMEAMCSTUBSAWARDSEARNEDAMOUNT", "LIFETIMEAMCSTUBSSPENDAMOUNT", "TICKETQTYSUM", "TICKETBALANCEDUESUM", "CONCQTYSUM", "CONCLOYDISCOUNTAMTSUM" and "CONCBALANCEDUESUM". I will use these seven variables to predict the "Is Premier". 
+
+
+
